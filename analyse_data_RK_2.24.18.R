@@ -534,8 +534,8 @@
     
     #Imputation
     ## calculate proportion infected in vaccine and control in sample
-    rv<-num_events_vacc_sample_asymp/num_vacc_sample
-    rc<-num_events_cont_sample_asymp/num_cont_sample
+    rv<-num_events_vacc_sample/num_vacc_sample
+    rc<-num_events_cont_sample/num_cont_sample
     
     ## Imputed infection status of the symptomatics will be their true infection status
     results_analysis_impute_int$imputation[results_analysis_impute_int$Symptomatic==1] <- 1
