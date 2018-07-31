@@ -522,18 +522,20 @@
     num_vacc_sample <- nrow(mysample[mysample$TrialStatus==1,])
     num_events_vacc_sample <- nrow(mysample[(mysample$TrialStatus==1) & (mysample$eventstatus==1),])
     num_events_vacc_sample_symp <- nrow(mysample[(mysample$TrialStatus==1) & (mysample$eventstatus==1) & (mysample$Symptomatic==1),])
-    
+    num_events_vacc_sample_asymp <- nrow(mysample[(mysample$TrialStatus==1) & (mysample$eventstatus==1) & (mysample$Symptomatic==0),])
+
     num_cont_sample <- nrow(mysample[mysample$TrialStatus==0,])
     num_events_cont_sample <- nrow(mysample[(mysample$TrialStatus==0) & (mysample$eventstatus==1),])
     num_events_cont_sample_symp <- nrow(mysample[(mysample$TrialStatus==0) & (mysample$eventstatus==1) & (mysample$Symptomatic==1),])
-    
+    num_events_cont_sample_asymp <- nrow(mysample[(mysample$TrialStatus==0) & (mysample$eventstatus==1) & (mysample$Symptomatic==0),])
+
     ## Estimate VE against progression to symptoms in the sample
     VEP_impute <- 1- (num_events_vacc_sample_symp/num_events_vacc_sample)/(num_events_cont_sample_symp/num_events_cont_sample)
     
     #Imputation
     ## calculate proportion infected in vaccine and control in sample
-    rv<-num_events_vacc_sample/num_vacc_sample
-    rc<-num_events_cont_sample/num_cont_sample
+    rv<-num_events_vacc_sample_asymp/num_vacc_sample
+    rc<-num_events_cont_sample_asymp/num_cont_sample
     
     ## Imputed infection status of the symptomatics will be their true infection status
     results_analysis_impute_int$imputation[results_analysis_impute_int$Symptomatic==1] <- 1
