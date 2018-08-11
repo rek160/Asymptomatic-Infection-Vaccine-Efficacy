@@ -496,14 +496,14 @@
       VEC_pval_unstrat <-NA
     }
     
-    #Imputation
+   #Imputation
     ## Take a random sample of 10% of non-symptomatic (asymptomatically infected or uninfected) in vaccine group and control group
     results_analysis_impute_int <- results_analysis_int
-    
+
     ## Add column to record imputed infection status
     results_analysis_impute_int <- cbind(results_analysis_impute_int,rep(NA,nrow(results_analysis_impute_int)))
     names(results_analysis_impute_int) <- c("InfectedNode","DayInfected","Community","TrialStatus","Symptomatic","DayEnrolled","eventstatus","imputation")
-    
+
     ## calculate size of 10% sample and then take half of that amount from vaccine group and half from control group
     sample <- round(nrow(results_analysis_impute_int)*sample_percent,0)
     sample_v <- round(sample/2,0)
@@ -514,10 +514,10 @@
     mysample_cont <- mysample[mysample$TrialStatus==0,]
     mysample_cont <- mysample_cont[sample(1:nrow(mysample_cont), sample_c,replace=FALSE),] 
     mysample <- rbind(mysample_vacc,mysample_cont)
-    
+
     ## Record their imputed infection status as their actual infection status as this will be known from testing the sample
     results_analysis_impute_int$imputation[(results_analysis_impute_int$InfectedNode %in% mysample$InfectedNode)] <- results_analysis_impute_int$eventstatus[(results_analysis_impute_int$InfectedNode %in% mysample$InfectedNode)]
-    
+
     ## Calculate numbers infected in the sample
     num_vacc_sample <- nrow(mysample[mysample$TrialStatus==1,])
     num_events_vacc_sample <- nrow(mysample[(mysample$TrialStatus==1) & (mysample$eventstatus==1),])
@@ -531,35 +531,38 @@
 
     ## Estimate VE against progression to symptoms in the sample
     VEP_impute <- 1- (num_events_vacc_sample_symp/num_events_vacc_sample)/(num_events_cont_sample_symp/num_events_cont_sample)
-    
+
     #Imputation
     ## calculate proportion infected in vaccine and control in sample
     rv<-num_events_vacc_sample/num_vacc_sample
     rc<-num_events_cont_sample/num_cont_sample
-    
+
     ## Imputed infection status of the symptomatics will be their true infection status
     results_analysis_impute_int$imputation[results_analysis_impute_int$Symptomatic==1] <- 1
-    
+
     ## Save data set before imputation so will be able to reset for multiple imputation
     results_analysis_impute_int2 <- results_analysis_impute_int
-    
+
     ## Will impute 10 times (multiple imputation)
     Qs <- c()
     Us <- c()
     for (k in 1:10){
       results_analysis_impute_int <- results_analysis_impute_int2
-      
+
       ## Impute infection status using rv and rc
-      results_analysis_impute_int$imputation[(results_analysis_impute_int$TrialStatus==1) & is.na(results_analysis_impute_int$imputation)]<-rbinom(nrow(results_analysis_impute_int[(results_analysis_impute_int$TrialStatus==1) & is.na(results_analysis_impute_int$imputation),]),1,rv)
-      results_analysis_impute_int$imputation[(results_analysis_impute_int$TrialStatus==0) & is.na(results_analysis_impute_int$imputation)]<-rbinom(nrow(results_analysis_impute_int[(results_analysis_impute_int$TrialStatus==0) & is.na(results_analysis_impute_int$imputation),]),1,rc)
-      
+      non_sample <- results_analysis_impute_int[!(results_analysis_impute_int$InfectedNode %in% mysample$InfectedNode),]
+      rv_asympt <- (rv*nrow(non_sample[non_sample$TrialStatus==1,])-nrow(non_sample[(non_sample$TrialStatus==1) & (non_sample$eventstatus==1) & (non_sample$Symptomatic==1),]))/nrow(non_sample[is.na(non_sample$imputation) & non_sample$TrialStatus==1,])
+      rc_asympt <- (rc*nrow(non_sample[non_sample$TrialStatus==0,])-nrow(non_sample[(non_sample$TrialStatus==0) & (non_sample$eventstatus==1) & (non_sample$Symptomatic==1),]))/nrow(non_sample[is.na(non_sample$imputation) & non_sample$TrialStatus==0,])
+      results_analysis_impute_int$imputation[(results_analysis_impute_int$TrialStatus==1) & is.na(results_analysis_impute_int$imputation)]<-rbinom(nrow(results_analysis_impute_int[(results_analysis_impute_int$TrialStatus==1) & is.na(results_analysis_impute_int$imputation),]),1,rv_asympt)
+      results_analysis_impute_int$imputation[(results_analysis_impute_int$TrialStatus==0) & is.na(results_analysis_impute_int$imputation)]<-rbinom(nrow(results_analysis_impute_int[(results_analysis_impute_int$TrialStatus==0) & is.na(results_analysis_impute_int$imputation),]),1,rc_asympt)
+
       ## Set day infected to be end of trial for those with imputed infection status of 1 (among asymptomatics)
       results_analysis_impute_int$DayInfected[(results_analysis_impute_int$imputation==1) & ((results_analysis_impute_int$Symptomatic==0) | is.na(results_analysis_impute_int$Symptomatic))]<- trial_length + trial_startday
 
       ## Set interval for those with non-event imputed status to be end of trial through infinity
       results_analysis_impute_int$DayEnrolled[(results_analysis_impute_int$imputation==0)]<- trial_length + trial_startday
       results_analysis_impute_int$DayInfected[(results_analysis_impute_int$imputation==0)]<-Inf
-      
+
       ## Run interval censored model on imputed data
       if (numevents_vacc>0 && numevents_cont>0){
         survmodel<- try(ic_sp(cbind(DayEnrolled, DayInfected) ~ TrialStatus, model = 'ph',
@@ -595,19 +598,19 @@
         results_analysis_impute_int2<-results_analysis_impute_int
         newevent_v_rownum <- min(which((results_analysis_impute_int2$eventstatus==0)&(results_analysis_impute_int2$TrialStatus==1)))
         newevent_c_rownum <- min(which((results_analysis_impute_int2$eventstatus==0)&(results_analysis_impute_int2$TrialStatus==0)))
-        
+
         eventtime <- median(results_analysis_impute_int2$DayInfected[results_analysis_impute_int2$eventstatus==1])
-        
+
         results_analysis_impute_int2$DayInfected[newevent_v_rownum] <- eventtime
         results_analysis_impute_int2$eventstatus[newevent_v_rownum] <- 1
-        
+
         results_analysis_impute_int2$DayInfected[newevent_c_rownum] <- eventtime
         results_analysis_impute_int2$eventstatus[newevent_c_rownum] <- 1
-        
+
         survmodel<- try(ic_sp(cbind(DayEnrolled, DayInfected) ~ TrialStatus, model = 'ph',
                               bs_samples = 50, data = results_analysis_impute_int2))
         usesurvmod2 <- !inherits(survmodel, 'try-error')
-        
+
         if (usesurvmod2==TRUE){
           vaccEffEst_total_impute_int<-c(1,1,1)
           vaccEffEst_total_impute_int_low <- 1-exp(survmodel$coefficients + 1.96*sqrt(survmodel$var))
@@ -631,9 +634,9 @@
         VEC_impute_int_var <- NA
         VEC_pval_impute_int <- NA
       }
-      
+
       vaccEffEst_total_impute_int <- c(vaccEffEst_total_impute_int[1],vaccEffEst_total_impute_int_low[1],vaccEffEst_total_impute_int_high[1])
-      
+
       # U is average variance of imputed estimates
       # m is number of times impute
       # B is between imputation variance
@@ -641,7 +644,7 @@
       Qs <- c(Qs,vaccEffEst_total_impute_int[1])
       Us <- c(Us,VEC_impute_int_var[1])
     }
-    
+
     Q <- mean(Qs,na.rm=TRUE)
     U <- mean(Us,na.rm=TRUE)
     Between <- c()
@@ -654,6 +657,7 @@
     vaccEffEst_total_impute_int_lower<-Q-1.96*sqrt(T)
     vaccEffEst_total_impute_int_upper<-Q+1.96*sqrt(T)
     VEC_impute_int_var<-T
+  
   
     
     
